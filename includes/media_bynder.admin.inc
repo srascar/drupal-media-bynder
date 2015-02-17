@@ -292,6 +292,9 @@ function media_bynder_query_facet_link($facet, $facet_value, $selected_facets, $
     foreach(array_filter($selected_facets) as $selected_facet_key => $selected_facet){
         $csv_facets[$selected_facet_key] = implode(',', $selected_facet);
     }
+    if($_GET["iframe"]){
+        $csv_facets['iframe'] = true;
+    }
     $value = http_build_query($csv_facets);
     return $value;
 }

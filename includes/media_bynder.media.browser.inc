@@ -19,7 +19,10 @@ function media_bynder_media_browser_plugin_view($plugin_name, $params) {
 function media_bynder_browser_filter_form($form, &$form_state) {
     module_load_include('inc', 'media', 'includes/media.browser');
 
-    $data['bynder_search'] = media_bynder_generate_search($form_state);
+    $data['bynder_iframe'] = array(
+        "#prefix" => "<iframe src='/admin/content/media/add/media_bynder?iframe=true' width='100%' height='800px'> </iframe>"
+    );
+    // $data['bynder_search'] = media_bynder_generate_search($form_state);
 
     return array('bynder' => $data);
 }

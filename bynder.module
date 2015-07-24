@@ -1,0 +1,366 @@
+<?php
+/**
+ * @file
+ * Module to manage Bynder files in filefield
+ */
+
+/*
+ * implement hook_stream_wrappers
+ */
+function bynder_stream_wrappers() {
+  return array(
+    'bynder' => array(
+      'name' => t('Bynder media'),
+      'class' => 'BynderStreamWrapper',
+      'description' => t('Media provided by Bynder.'),
+      'type' => STREAM_WRAPPERS_READ_VISIBLE | STREAM_WRAPPERS_WRITE_VISIBLE
+    )
+  );
+}
+/**
+ * Implements hook_menu().
+ */
+function bynder_menu() {
+  $items = array();
+
+  $items['admin/config/media/bynder'] = array(
+    'title' => ' Bynder Settings',
+    'description' => 'Configuration for  Bynder module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array(
+      'bynder_admin_form'
+    ),
+    'access arguments' => array(
+      'administer  bynder'
+    ),
+    'type' => MENU_NORMAL_ITEM,
+    'file path' => drupal_get_path('module', 'bynder') . '/includes',
+    'file' => 'bynder.admin.inc',
+  );
+
+  $items['bynder-add-media/%ctools_js/%/%'] = array(
+    'title' => 'Add  Bynder Media',
+    'page callback' => 'bynder_add_media_callback',
+    'page arguments' => array(1, 2, 3),
+    'access arguments' => array('use  bynder'),
+    'type' => MENU_CALLBACK,
+    'file path' => drupal_get_path('module', 'bynder') . '/includes',
+    'file' => 'bynder.add_media.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function bynder_permission() {
+  return array(
+    'administer  bynder' => array(
+      'title' => t('Administer  Bynder'),
+      'description' => t('Configure Bynder API connection settings.'),
+    ),
+    'use  bynder' => array(
+      'title' => t('Use  Bynder'),
+      'description' => t('User can add, edit or remove medias .'),
+    ),
+  );
+}
+
+/**
+ * Initialize the Bynder REST client.
+ */
+function bynder_rest_client() {
+  return new BynderRestClient(
+    variable_get('bynder_url', '') . '/api/v4',
+    variable_get('bynder_oauth_consumer', ''),
+    variable_get('bynder_oauth_consumer_secret', ''),
+    variable_get('bynder_oauth_token', ''),
+    variable_get('bynder_oauth_token_secret', '')
+  );
+}
+
+/**
+ * Implements hook_library().
+ *
+ * Files needed to display Brynder library (search, filter and select medias
+ * to add in Drupal).
+ */
+function bynder_library() {
+  $path = drupal_get_path('module', 'bynder');
+  $info = system_get_info('module', 'bynder');
+
+  $common = array(
+    'website' => 'http://www.getbynder.com',
+    'version' => !empty($info['version']) ? $info['version'] : '7.x-1.x',
+  );
+
+  // Powers the 'Add media from Bynder' page.
+  $libraries['bynder_add_form'] = array(
+    'title' => ' Bynder Add form',
+    'js' => array(
+      $path . '/js/bynder.js' => array(
+        'group' => JS_LIBRARY,
+        'weight' => -5,
+      ),
+    ),
+    'css' => array(
+      $path . '/bynder.css' => array(),
+    ),
+    'dependencies' => array(
+      array('bynder', 'spin'),
+    ),
+  );
+
+  // Generates animated CSS3 loading spinners.
+  $libraries['spin'] = array(
+    'title' => 'Spin',
+    'js' => array(
+      $path . '/js/spin.min.js' => array(
+        'group' => JS_DEFAULT,
+      ),
+    ),
+  );
+
+  // Add common information to each library.
+  foreach ($libraries as &$library) {
+    $library += $common;
+  }
+
+  return $libraries;
+}
+
+/**
+ * Implement hook_filefield_sources_info()
+ *
+ * Declare the new "Filefield Sources" Bynder source.
+ */
+function bynder_filefield_sources_info() {
+  $sources = array();
+
+  // Provide a potential Flickr source to import Flickr photos.
+  $sources['bynder'] = array(
+    'name' => t('File attach from Bynder'),
+    'label' => t('Bynder'),
+    'type'=>'bynder',
+    'description' => t('Select a file from Bynder.'),
+    // This callback function does all the heavy-work of creating a form element
+    // to choose a Flickr photo and populate a field. For an example, see
+    // filefield_source_remote_process().
+    'process' => 'bynder_filefield_sources_bynder_process',
+    // This callback function then takes the value of that field and saves the
+    // file locally. For an example, see filefield_source_remote_value().
+    'value' => 'bynder_filefield_sources_bynder_value',
+    // Light weight to make Bynder tab is first
+    'weight' => -100,
+    // This optional setting will ensure that your code is included when needed
+    // if your value, process, or other callbacks are located in a file other
+    // than your .module file.
+//    'file' => 'includes/bynder.filefield_sources_bynder.inc',
+  );
+  return $sources;
+}
+
+
+
+/**
+ * Implements hook_theme().
+ */
+function bynder_theme() {
+  return array(
+    'bynder_filefield_sources_bynder_element' => array(
+      'render element' => 'element',
+//      'file' => 'includes/bynder.filefield_sources_bynder.inc',
+    ),
+  );
+}
+
+/**
+ * A #process callback to extend the filefield_widget element type.
+ */
+function bynder_filefield_sources_bynder_process($element, &$form_state, $form) {
+
+  // Base name to construct fields names
+  $field_base_name = implode('_', $element['#array_parents']);
+
+  $element['filefield_bynder'] = array(
+    '#weight' => 100.5,
+    '#theme' => 'bynder_filefield_sources_bynder_element',
+    '#filefield_source' => TRUE,
+    // Required for proper theming.
+//    '#description' => filefield_sources_element_validation_help($element['#upload_validators']),
+//    '#filefield_sources_hint_text' => t('Insert your Bynder URL here'),
+  );
+
+  // Adding of elements needed by Ctools to display a modal box
+  ctools_include('ajax');
+  ctools_include('modal');
+  ctools_modal_add_js();
+  // TODO styling modal box
+
+  // Link to display Bynder Box
+  $link_modal_title = t('Add Bynder Media');
+  $link_modal_path = 'bynder-add-media/nojs/' . $element['#field_name'] . '/' . $element['#array_parents'][2];
+
+  // Link to run Bynder modal box
+  $element['filefield_bynder']['modal_link'] = array(
+    '#markup' => ctools_modal_text_button($link_modal_title, $link_modal_path, NULL, 'button ctools-modal-bynder-add-media'),
+  );
+  // Field to input the Bynder media URL (image or video). Hidden Field
+  $element['filefield_bynder']['url'] = array(
+    // IE doesn't support onchange events for hidden fields, so we use a
+    // textfield and hide it from display.
+    '#type' => 'textfield',
+    '#maxlength' => NULL,
+    '#attributes' => array('style' => 'display: none;'),
+  );
+
+  // Submit button to save Bynder media URL (this field is hidden)
+  $originalId = preg_replace('/-upload$/','',$element['#id']);
+  $element['filefield_bynder']['submit'] = array(
+//    '#name' => $field_base_name . '_submit',
+    '#name' => implode('_', $element['#array_parents']) . '_submit',
+    '#type' => 'submit',
+    '#value' => t('Select'),
+    '#validate' => array(),
+    '#submit' => array('filefield_sources_field_submit'),
+    '#limit_validation_errors' => array($element['#parents']),
+    '#ajax' => array(
+      'path' => 'file/ajax/' . implode('/', $element['#array_parents']) . '/' . $form['form_build_id']['#value'],
+      'wrapper' => $originalId . '-ajax-wrapper',
+      'effect' => 'fade',
+      'method' => 'replace',
+    ),
+    '#attributes' => array('style' => 'display: none;'),
+    '#suffix' => '<div class="description">' . t('This field will ignore the file size limitation') . '</div>',
+  );
+
+  return $element;
+}
+
+/**
+ * A #filefield_value_callback function.
+ */
+function bynder_filefield_sources_bynder_value($element, &$item) {
+  if (isset($item['filefield_bynder']['url']) && drupal_strlen($item['filefield_bynder']['url']) > 0) {
+    $value = $item['filefield_bynder']['url'];
+    $scheme = file_uri_scheme($value);
+    if (!valid_url($value, TRUE)) {
+     // form_error($element, t('Invalid Remote File URL.'));
+     // return;
+    }
+    elseif (!file_stream_wrapper_valid_scheme($scheme)) {
+      // Check that the scheme is supported.
+      form_error($element, t('Remote File URLs with the %scheme scheme are not supported.', array('%scheme' => $scheme)));
+      return;
+    }
+    else {
+      // Check that the file exists.
+      $request = drupal_http_request($value, array('method' => 'HEAD'));
+      if (!empty($request->error)) {
+        form_error($element, t('Unable to fetch file from Remote File URL %url (error @code: %error).', array(
+          '%url' => $value,
+          '@code' => $request->code,
+          '%error' => $request->error
+        )));
+        return;
+      }
+    }
+
+    try {
+      $file=bynder_file_load_by_id($value);
+      if(!$file) {
+        $file = bynder_file_create($value);
+      }
+      file_save($file);
+
+    } catch (Exception $e) {
+      form_set_error('url', $e->getMessage());
+      return;
+    }
+
+    if (empty($file->fid)) {
+      form_set_error($element, t('Unable to add file from URL %file.', array('%file' => $value)));
+      return;
+    }
+
+    // Run all the normal validations, minus file size restrictions.
+    if (isset($element['#upload_validators']['file_validate_size'])) {
+      unset($element['#upload_validators']['file_validate_size']);
+    }
+
+      $item = array_merge($item, (array) $file);
+
+  }
+}
+
+/**
+ * Theme the Bynder input in file field sources edition field.
+ */
+function theme_bynder_filefield_sources_bynder_element($vars) {
+  $element = $vars['element'];
+  $output = drupal_render_children($element);
+  return '<div class="filefield-source filefield-source-bynder clear-block">' . $output . '</div>';
+}
+
+function bynder_file_load_by_id($id){
+  $uri = file_stream_wrapper_uri_normalize($id);
+  $files = entity_load('file', FALSE, array('uri' => $uri));
+  return !empty($files) ? reset($files) : FALSE;
+}
+
+function bynder_file_create($id) {
+  $file = new stdClass();
+  $file->fid = NULL;
+  $file->uri = $id;
+  $file->filename = basename($file->uri);
+  $file->filemime = 'image/bynder';
+  $file->uid = $GLOBALS['user']->uid;
+  $file->status = FALSE;
+  $file->filesize = 10;
+  return $file;
+
+}
+
+/**
+ * Create the embed url for a fragment. Retrieve it directly from the API.
+ *
+ * @param string $fragment_id
+ * @param array $type effect
+ */
+function bynder_embed_url($mediaId, $type=false, $effects=false){
+  if(!$type) {
+    $type = "thul";
+  }
+
+  $bynderApi = bynder_rest_client();
+  $mediaInfos = $bynderApi->getMediaObject($mediaId);
+  $mediaInfos = json_decode($mediaInfos);
+
+  return $mediaInfos->thumbnails->$type;
+}
+
+
+/**
+ * Parse the style out of the uri.
+ */
+function bynder_uri_parse_style_url($uri) {
+  $target = file_uri_target($uri);
+  $parts = explode('/', $target);
+  if(isset($parts[1]) && isset($parts[4]) && isset($parts[6])){
+    $data = array(
+      "style" => $parts[1],
+      "f" => $parts[4],
+      "i" => $parts[6],
+      "effects" => []
+    );
+    $image_styles = image_styles();
+    $image_style = $image_styles[$data['style']];
+    foreach($image_style['effects'] as $effect){
+      $data['effects'][$effect['name']] = $effect['data'];
+    }
+    return $data;
+  }else{
+    return FALSE;
+  }
+}

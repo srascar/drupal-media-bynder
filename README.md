@@ -1,51 +1,22 @@
-drupal-media-bynder
-====================
+# Bynder Module
 
-This configuration guide is based on the standard drupal installation, the current version of drupal is 7.x. Any issues can be reported to [github] (https://github.com/Bynder/drupal-media-bynder/issues).
+This module provide a direct link to the Bynder API trough a modal to explore and select the medias.
+The module is designed to be used with an **image field ** or a ** file field **.
 
-For more information please visit [www.getbynder.com](http://www.getbynder.com) or contact us at [info@getbynder.com](mailto:info@getbynder.com)
+It creates a new file sources entry called **File attach from Bynder** in order to keep other contribution methods on the same field and the additional informations.
+Actually when linking a picture we are not getting the metadatas of the media. We just get the external thumbnail to display it on the node form.
+The modal keeps the search and filters functionnalities from the original Bynder Media Module.
 
-Server Requirements
------------------------------------
-Curl must be installed and enabled to run the Bynder plugin
+The module creates a new stream wrapper called "bynder" and store me media URLs like **bynder://[mediaId]** in te *managed files* database. The module does not provide any image presets. The original *uri_parse_style_url* function had been kept but is not used instead we do have a *bynder_embed_url* function returning the public couldfront URL of the selected profile.
 
+### Patch note
+Actually we had to patch the Drupal core in the image module for the *hook_field_validate* and the undetermined width and height of the pictures.
+https://www.drupal.org/files/issues/image-validate-1330952-63-d7.patch
 
-Install the media_bynder module
------------------------------------
-Download the latest release and copy the bynder module to "sites/all/modules" and rename the folder to "media_bynder" if necessary or rename the zip file to "media_bynder" before uploading.
+### Dependencies
+* oauth_common To manage the REST API
+* Ctools to manage the modal and ajax
+* That's it! :)
 
-
-Required Modules
----------------------
-Upload the following required modules into the folder "sites/all/modules", some modules require additional modules to operate!  
-Versions matter!
-
-*   [Media 2.x] (https://drupal.org/project/media)
-*   [OAuth 3.x] (https://drupal.org/project/oauth)
-*   [File Entity 2.x] (https://www.drupal.org/project/file_entity)
-*   [WYSIWYG 2.x] (https://www.drupal.org/project/wysiwyg)
-*   [CTools 1.x] (https://www.drupal.org/project/ctools)
-*   [Views 3.x] (https://www.drupal.org/project/views)
-*   [CKEditor 3.x] (http://ckeditor.com/download)
-
-Go to the "Modules" panel in your admin view and enable the listed modules.
-
-
-Bynder Configuration Settings
----------------------
-<h3>Bynder API</h3>
-*Bynder url:* The url to be used by the module to communicate with Bynder.  
-*Bynder oauth consumer:* The oauth consumer to be used by the module to communicate with Bynder.  
-*Bynder oauth consumer secret:* The oauth consumer secret to be used by the module to communicate with Bynder.  
-*Bynder oauth token:* The oauth token to be used by the module to communicate with Bynder.  
-*Bynder oauth token secret:* The oauth token secret to be used by the module to communicate with Bynder.
-
-These settings require a Bynder account, for more information please visit [www.getbynder.com](http://www.getbynder.com)
-
-
-Usage of the module
----------------------
-In order to include media from Bynder into Drupal, go to Content and click the link Media. Here you can click on "Add media from Bynder".
-Enter a search term and/or click any of the provided facets.
-Select an image by clicking on it.
-A confirmation "Successfully added media to Library" will be shown and the media file will be available for usage in the Library.
+### Next steps
+The module provides only the needed functionnalities for the current project. This is just a starter for a global Bynder module, no further developments are actually planned on the module because the current project does not required anything more.

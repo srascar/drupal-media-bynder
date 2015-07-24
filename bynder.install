@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the Bynder module.
+ */
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function bynder_uninstall() {
+  // Delete variables created by bynder
+  variable_del('bynder_url');
+  variable_del('bynder_oauth_consumer');
+  variable_del('bynder_oauth_consumer_secret');
+  variable_del('bynder_oauth_token');
+  variable_del('bynder_oauth_token_secret');
+}

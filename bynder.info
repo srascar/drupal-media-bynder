@@ -1,0 +1,8 @@
+name = Bynder
+description = Get medias from Bynder
+core = 7.x
+version = 7.x-1.2
+dependencies[] = oauth_common
+files[] = includes/BynderRestClient.inc
+files[] = includes/BynderStreamWrapper.inc
+configure = admin/config/content/bynder
